@@ -1,0 +1,18 @@
+{
+  "name": "quiz-buzzer-app",
+  "version": "1.0.0",
+  "description": "Real-time Quiz Buzzer application",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "cd client && npm install && npm run build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
+  }
+}
