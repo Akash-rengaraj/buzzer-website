@@ -108,10 +108,13 @@ function App() {
     });
   };
 
-  const handleBuzz = () => {
-    socket.emit('buzz', { room });
-    // Haptic feedback if on mobile (supported browsers)
-    if (navigator.vibrate) navigator.vibrate(50);
+  const handleStart = () => {
+    socket.emit('start_round', { room });
+    // Play "Whistle" or "Go" sound?
+  };
+
+  const handleStop = () => {
+    socket.emit('stop_round', { room });
   };
 
   const handleReset = () => {
@@ -171,8 +174,17 @@ function App() {
           <div className="buzz-list">
             {buzzes.length === 0 ? (
               <div className="placeholder-text">
-                <div style={{fontSize: '3rem', marginBottom: '1rem'}}>⏱️</div>
-                Ready to race!
+                {isLocked ? (
+                  <>
+                    <div style={{fontSize: '3rem', marginBottom: '1rem'}}>🔒</div>
+                    Buzzers Locked
+                  </>
+                ) : (
+                  <>
+                    <div style={{fontSize: '3rem', marginBottom: '1rem'}}>🟢</div>
+                    Buzzers OPEN!
+                  </>
+                )}
               </div>
             ) : (
               <ul>
@@ -189,7 +201,28 @@ function App() {
               </ul>
             )}
           </div>
-          <button className="reset-btn" onClick={handleReset}>🔄 RESET ROUND</button>
+          
+          <div className="buttons-col">
+            {!isLocked ? (
+              <button 
+                className="stop-btn" 
+                onClick={handleStop}
+                style={{background: '#FF4444', marginBottom: '1rem'}}
+              >
+                🛑 STOP ROUND
+              </button>
+            ) : (
+               <button 
+                className="start-btn" 
+                onClick={handleStart}
+                style={{background: '#6BCB77', marginBottom: '1rem'}}
+              >
+                🏁 START ROUND
+              </button>
+            )}
+            
+            <button className="reset-btn" onClick={handleReset}>🔄 COMPLETE RESET</button>
+          </div>
         </div>
       )}
 
@@ -202,12 +235,19 @@ function App() {
             </div>
           </div>
           
+          {/* Waiting Message when Locked */}
+          {isLocked && !iHaveBuzzed && (
+            <div style={{marginBottom: '2rem', fontSize: '1.5rem', fontWeight: 'bold', color: '#888'}}>
+              👀 Waiting for Host...
+            </div>
+          )}
+
           <button 
-            className={`big-buzzer ${iHaveBuzzed ? 'disabled rank-show' : ''}`} 
+            className={`big-buzzer ${iHaveBuzzed ? 'disabled rank-show' : ''} ${isLocked && !iHaveBuzzed ? 'disabled locked' : ''}`} 
             onClick={handleBuzz} 
             disabled={iHaveBuzzed || isLocked}
           >
-            {iHaveBuzzed ? `#${myBuzzIndex + 1}` : 'BUZZ!'}
+            {iHaveBuzzed ? `#${myBuzzIndex + 1}` : (isLocked ? 'WAIT' : 'BUZZ!')}
           </button>
         </div>
       )}

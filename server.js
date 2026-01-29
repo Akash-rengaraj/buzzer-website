@@ -90,7 +90,7 @@ io.on("connection", (socket) => {
         hostId: null,
         players: {},
         buzzes: [],
-        isLocked: false,
+        isLocked: true, // Default to locked
       };
       console.log(`Created room: ${roomCode}`);
     }
@@ -102,14 +102,6 @@ io.on("connection", (socket) => {
 
     // Update State based on Role
     if (role === 'HOST') {
-      // If host already exists, maybe deny or overwrite? 
-      // Let's allow overwrite/reconnect for now, or just secondary host.
-      // But strictly:
-      if (currentRoom.hostId && currentRoom.hostId !== socket.id) {
-         // Another host is there. Treat as secondary? Or error?
-         // Let's just update to new host (e.g. refresh)
-         // Ideally provided a password, but simple for now.
-      }
       currentRoom.hostId = socket.id;
     } else {
       // PLAYER
@@ -134,7 +126,7 @@ io.on("connection", (socket) => {
     
     // Validation
     if (currentRoom.isLocked) {
-      return socket.emit("error", "Buzzers are locked!"); // Or just ignore
+      return socket.emit("error", "Buzzers are locked!"); 
     }
 
     // Check if player is in this room
@@ -153,36 +145,49 @@ io.on("connection", (socket) => {
     };
     currentRoom.buzzes.push(buzzEntry);
     
-    // Optional: Lock after first buzz? Or allow multiple? 
-    // Usually buzzer systems allow list of first X. We keep allowing.
-
     // Broadcast
     io.to(roomCode).emit("buzzed", buzzEntry); // Immediate feedback
     io.to(roomCode).emit("room_update", getRoomState(roomCode)); // Sync state
   });
 
-  // --- RESET ---
+  // --- CONTROLS: START / STOP / RESET ---
+  socket.on("start_round", ({ room }) => {
+    if (!room) return;
+    const roomCode = room.toUpperCase();
+    const currentRoom = rooms[roomCode];
+    if (!currentRoom) return;
+    if (currentRoom.hostId !== socket.id) return socket.emit("error", "Only host can start.");
+
+    currentRoom.isLocked = false;
+    io.to(roomCode).emit("room_update", getRoomState(roomCode));
+    console.log(`Room ${roomCode} STARTED`);
+  });
+
+  socket.on("stop_round", ({ room }) => {
+    if (!room) return;
+    const roomCode = room.toUpperCase();
+    const currentRoom = rooms[roomCode];
+    if (!currentRoom) return;
+    if (currentRoom.hostId !== socket.id) return socket.emit("error", "Only host can stop.");
+
+    currentRoom.isLocked = true;
+    io.to(roomCode).emit("room_update", getRoomState(roomCode));
+    console.log(`Room ${roomCode} STOPPED`);
+  });
+
   socket.on("reset", ({ room }) => {
     if (!room) return;
     const roomCode = room.toUpperCase();
     const currentRoom = rooms[roomCode];
-
     if (!currentRoom) return;
-
-    // Security: Only Host can reset? 
-    // Ideally check if socket.id === currentRoom.hostId
-    if (currentRoom.hostId !== socket.id) {
-      return socket.emit("error", "Only host can reset.");
-    }
+    if (currentRoom.hostId !== socket.id) return socket.emit("error", "Only host can reset.");
 
     currentRoom.buzzes = [];
-    currentRoom.isLocked = false;
-    
-    // Check lock parameter if we added "Lock" feature later
+    currentRoom.isLocked = true; // Reset implies returning to wait state
     
     io.to(roomCode).emit("reset_buzzer");
     io.to(roomCode).emit("room_update", getRoomState(roomCode));
-    console.log(`Room ${roomCode} reset by host`);
+    console.log(`Room ${roomCode} RESET`);
   });
 
   // --- DISCONNECT ---
