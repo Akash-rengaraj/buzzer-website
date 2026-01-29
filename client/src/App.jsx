@@ -108,6 +108,12 @@ function App() {
     });
   };
 
+  const handleBuzz = () => {
+    socket.emit('buzz', { room });
+    // Haptic feedback if on mobile (supported browsers)
+    if (navigator.vibrate) navigator.vibrate(50);
+  };
+
   const handleStart = () => {
     socket.emit('start_round', { room });
     // Play "Whistle" or "Go" sound?
