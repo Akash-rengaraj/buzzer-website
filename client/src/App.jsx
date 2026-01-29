@@ -228,27 +228,42 @@ function App() {
 
       {gameState === 'PLAYER' && (
         <div className="player-view">
-          <div className="player-info">
-            <h2>{getAvatar(name)} {name}</h2>
-            <div style={{background: '#fff', padding: '0.5rem 1rem', borderRadius: '10px', display:'inline-block', marginTop:'0.5rem'}}>
-              Room: <strong>{room}</strong>
+          <div className="player-card">
+            <div className="player-info">
+              <h2>{getAvatar(name)} {name}</h2>
+              <div style={{background: '#F0F0F0', padding: '0.5rem 1rem', borderRadius: '10px', display:'inline-block', marginTop:'0.5rem', color: '#555'}}>
+                Room: <strong>{room}</strong>
+              </div>
             </div>
-          </div>
-          
-          {/* Waiting Message when Locked */}
-          {isLocked && !iHaveBuzzed && (
-            <div style={{marginBottom: '2rem', fontSize: '1.5rem', fontWeight: 'bold', color: '#888'}}>
-              👀 Waiting for Host...
+            
+            {/* Status Message */}
+            <div className="status-message">
+              {isLocked && !iHaveBuzzed ? (
+                <>
+                  <div className="lock-icon">🔒</div>
+                  <div>Waiting for Host...</div>
+                </>
+              ) : iHaveBuzzed ? (
+                <>
+                  <div className="lock-icon" style={{animation:'none'}}>🎉</div>
+                  <div>Buzz Registered!</div>
+                </>
+              ) : (
+                <>
+                  <div className="lock-icon" style={{animation:'bounce 0.5s infinite'}}>⚡</div>
+                  <div style={{color: 'var(--primary)', fontSize:'2rem'}}>GO! GO! GO!</div>
+                </>
+              )}
             </div>
-          )}
 
-          <button 
-            className={`big-buzzer ${iHaveBuzzed ? 'disabled rank-show' : ''} ${isLocked && !iHaveBuzzed ? 'disabled locked' : ''}`} 
-            onClick={handleBuzz} 
-            disabled={iHaveBuzzed || isLocked}
-          >
-            {iHaveBuzzed ? `#${myBuzzIndex + 1}` : (isLocked ? 'WAIT' : 'BUZZ!')}
-          </button>
+            <button 
+              className={`big-buzzer ${iHaveBuzzed ? 'disabled rank-show' : ''} ${isLocked && !iHaveBuzzed ? 'disabled locked' : ''}`} 
+              onClick={handleBuzz} 
+              disabled={iHaveBuzzed || isLocked}
+            >
+              {iHaveBuzzed ? `#${myBuzzIndex + 1}` : (isLocked ? 'WAIT' : 'BUZZ!')}
+            </button>
+          </div>
         </div>
       )}
     </div>
