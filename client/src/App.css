@@ -335,7 +335,7 @@ button:active {
   }
   .card, .player-card {
     padding: 1.5rem;
-    min-height: 250px;
+    min-height: 150px; /* Reduced to leave room for teleporting elements */
     border-radius: 1.5rem;
     border-width: 3px;
     width: 90vw;

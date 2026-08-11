@@ -30,6 +30,13 @@ function App() {
   const [inputPos, setInputPos] = useState({ top: '60%', left: '50%', transform: 'translate(-50%, -50%)' });
   const [targetPin, setTargetPin] = useState('');
   const [currentInput, setCurrentInput] = useState('');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 600);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Refs for socket callbacks to avoid stale closures and constant re-binding
   const gameStateRef = useRef(gameState);
@@ -75,21 +82,20 @@ function App() {
       // Teleport digits if transitioning from locked to unlocked, OR if joining an already unlocked room
       if (!roomState.isLocked && (wasLocked || hasNoPin)) {
         const padding = 15;
+        const currentIsMobile = window.innerWidth <= 600;
         
         // Define occupied areas to prevent overlaps
         const occupied = [];
         
-        // Add middle card (approx 500x400 centered) ONLY if screen is large enough
-        // On mobile, we let elements spawn over the center card because space is too limited.
-        if (window.innerWidth > 600) {
-          const cardW = 550, cardH = 450;
-          const cardX = (window.innerWidth - cardW) / 2;
-          const cardY = (window.innerHeight - cardH) / 2;
-          occupied.push({ x: cardX, y: cardY, w: cardW, h: cardH });
-        }
+        // Add middle card for both mobile and desktop so elements spawn AROUND it.
+        const cardW = currentIsMobile ? window.innerWidth * 0.9 : 550;
+        const cardH = currentIsMobile ? 240 : 450;
+        const cardX = (window.innerWidth - cardW) / 2;
+        const cardY = (window.innerHeight - cardH) / 2;
+        occupied.push({ x: cardX, y: cardY, w: cardW, h: cardH });
         
         const checkOverlap = (x, y, w, h) => {
-          const gap = 10; // gap between elements
+          const gap = currentIsMobile ? 5 : 10; // smaller gap on mobile
           for (let rect of occupied) {
             if (
               x < rect.x + rect.w + gap &&
@@ -107,21 +113,22 @@ function App() {
           let x, y;
           let attempts = 0;
           // Clamp max bounds so they never become negative, which causes all elements to stack at (padding, padding)
-          const maxW = Math.max(10, window.innerWidth - w - padding * 2);
-          const maxH = Math.max(10, window.innerHeight - h - padding * 2);
+          const maxW = Math.max(0, window.innerWidth - w - padding * 2);
+          const maxH = Math.max(0, window.innerHeight - h - padding * 2);
           
           do {
             x = padding + Math.floor(Math.random() * maxW);
             y = padding + Math.floor(Math.random() * maxH);
             attempts++;
-          } while (checkOverlap(x, y, w, h) && attempts < 100);
+          } while (checkOverlap(x, y, w, h) && attempts < 300); // More attempts for tight fits
           
           occupied.push({ x, y, w, h });
           return { x, y };
         };
 
         // Generate Input box position FIRST (larger = harder to place)
-        const inW = 180, inH = 150; // Use more realistic bounds
+        const inW = currentIsMobile ? 120 : 180;
+        const inH = currentIsMobile ? 160 : 250;
         const inputLoc = generatePos(inW, inH);
         setInputPos({
           top: `${inputLoc.y}px`,
@@ -132,7 +139,8 @@ function App() {
         });
 
         // Generate 4 random digits in non-overlapping locations
-        const pinW = 70, pinH = 80;
+        const pinW = currentIsMobile ? 45 : 70;
+        const pinH = currentIsMobile ? 55 : 80;
         let newPinStr = '';
         const digits = [];
 
@@ -427,7 +435,7 @@ function App() {
                   ...d.pos, 
                   background: 'var(--primary)', 
                   color: 'white', 
-                  padding: '5px 10px', 
+                  padding: isMobile ? '2px 5px' : '5px 10px', 
                   borderRadius: '10px', 
                   boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
                   border: '3px solid var(--text-main)',
@@ -435,14 +443,14 @@ function App() {
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  minWidth: '50px',
-                  minHeight: '60px'
+                  minWidth: isMobile ? '35px' : '50px',
+                  minHeight: isMobile ? '45px' : '60px'
                 }}
               >
-                <span style={{ fontSize: '0.8rem', color: '#ffe', marginBottom: '2px', fontWeight: 'bold' }}>
+                <span style={{ fontSize: isMobile ? '0.65rem' : '0.8rem', color: '#ffe', marginBottom: '2px', fontWeight: 'bold' }}>
                   {['1st', '2nd', '3rd', '4th'][d.order - 1]}
                 </span>
-                <span style={{ fontSize: '2rem', fontWeight: '900', lineHeight: '1' }}>
+                <span style={{ fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: '900', lineHeight: '1' }}>
                   {d.digit}
                 </span>
               </div>
@@ -458,31 +466,32 @@ function App() {
                     : {
                         ...inputPos,
                         background: 'white',
-                        padding: '1rem',
+                        padding: isMobile ? '0.5rem' : '1rem',
                         borderRadius: '20px',
                         boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
                         border: '4px solid var(--text-main)',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
-                        gap: '10px'
+                        gap: isMobile ? '5px' : '10px'
                       }
                 }
               >
                 {(!isLocked && !iHaveBuzzed && !iHaveFalseStart) && (
                   <input
                     type="number"
-                    placeholder="Enter PIN"
+                    placeholder="PIN"
                     value={currentInput}
                     onChange={(e) => setCurrentInput(e.target.value)}
                     style={{ 
                       width: '100%', 
-                      maxWidth: '180px',
+                      maxWidth: isMobile ? '100px' : '180px',
                       textAlign: 'center', 
-                      fontSize: '1.5rem', 
-                      letterSpacing: '5px', 
+                      fontSize: isMobile ? '1.2rem' : '1.5rem', 
+                      letterSpacing: isMobile ? '2px' : '5px', 
                       marginBottom: '0',
-                      borderRadius: '10px'
+                      borderRadius: '10px',
+                      padding: isMobile ? '0.5rem' : '1.2rem'
                     }}
                   />
                 )}
@@ -495,10 +504,10 @@ function App() {
                     iHaveFalseStart 
                       ? {backgroundColor: '#555', boxShadow: '0 5px #333'} 
                       : iHaveBuzzed ? {} 
-                      : { width: '150px', height: '150px', fontSize: '1.8rem', marginTop: '10px' }
+                      : { width: isMobile ? '90px' : '150px', height: isMobile ? '90px' : '150px', fontSize: isMobile ? '1.2rem' : '1.8rem', marginTop: isMobile ? '5px' : '10px' }
                   }
                 >
-                  {iHaveBuzzed ? `#${myBuzzIndex + 1}` : (iHaveFalseStart ? 'LOCKED OUT' : 'BUZZ!')}
+                  {iHaveBuzzed ? `#${myBuzzIndex + 1}` : (iHaveFalseStart ? 'LOCKED' : 'BUZZ')}
                 </button>
               </div>
             )}
