@@ -38,6 +38,7 @@ const getRoomState = (roomCode) => {
     isLocked: room.isLocked,
     buzzes: room.buzzes,
     players: Object.values(room.players).map(p => p.name),
+    falseStarts: (room.falseStarts || []).map(id => room.players[id]?.name).filter(Boolean),
     hasHost: !!room.hostId
   };
 };
@@ -90,6 +91,7 @@ io.on("connection", (socket) => {
         hostId: null,
         players: {},
         buzzes: [],
+        falseStarts: [],
         isLocked: true, // Default to locked
       };
       console.log(`Created room: ${roomCode}`);
@@ -124,14 +126,23 @@ io.on("connection", (socket) => {
 
     if (!currentRoom) return socket.emit("error", "Room not found.");
     
-    // Validation
-    if (currentRoom.isLocked) {
-      return socket.emit("error", "Buzzers are locked!"); 
-    }
-
     // Check if player is in this room
     const player = currentRoom.players[socket.id];
     if (!player) return socket.emit("error", "You are not a player in this room.");
+
+    // Check false start penalty
+    if (currentRoom.falseStarts.includes(socket.id)) {
+      return socket.emit("error", "You have a false start penalty for this round!");
+    }
+
+    // Validation (False Start mechanism)
+    if (currentRoom.isLocked) {
+      if (!currentRoom.falseStarts.includes(socket.id)) {
+        currentRoom.falseStarts.push(socket.id);
+        io.to(roomCode).emit("room_update", getRoomState(roomCode));
+      }
+      return socket.emit("error", "False Start! You are locked out for this round."); 
+    }
 
     // Check if player already buzzed
     const alreadyBuzzed = currentRoom.buzzes.find(b => b.socketId === socket.id);
@@ -183,6 +194,7 @@ io.on("connection", (socket) => {
     if (currentRoom.hostId !== socket.id) return socket.emit("error", "Only host can reset.");
 
     currentRoom.buzzes = [];
+    currentRoom.falseStarts = [];
     currentRoom.isLocked = true; // Reset implies returning to wait state
     
     io.to(roomCode).emit("reset_buzzer");

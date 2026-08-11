@@ -22,11 +22,14 @@ function App() {
   // Server State
   const [players, setPlayers] = useState([]);
   const [buzzes, setBuzzes] = useState([]);
+  const [falseStarts, setFalseStarts] = useState([]);
   const [isLocked, setIsLocked] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Sounds
-  // (In a real pro app, we'd preload these. For now we use visual only or browser speech maybe?)
+  const [pinDigits, setPinDigits] = useState([]);
+  const [inputPos, setInputPos] = useState({ top: '60%', left: '50%', transform: 'translate(-50%, -50%)' });
+  const [targetPin, setTargetPin] = useState('');
+  const [currentInput, setCurrentInput] = useState('');
 
   useEffect(() => {
     // Socket event listeners
@@ -42,20 +45,103 @@ function App() {
       if (!roomState) return;
       setPlayers(roomState.players || []);
       setBuzzes(roomState.buzzes || []);
+      setFalseStarts(roomState.falseStarts || []);
+      
+      // If we are transitioning from locked to unlocked, teleport the buzzer!
+      if (isLocked && !roomState.isLocked) {
+        const padding = 20;
+        
+        // Define occupied areas to prevent overlaps
+        const occupied = [];
+        
+        // Add middle card (approx 500x400 centered)
+        const cardW = 550, cardH = 450; // slightly larger to give breathing room
+        const cardX = (window.innerWidth - cardW) / 2;
+        const cardY = (window.innerHeight - cardH) / 2;
+        occupied.push({ x: cardX, y: cardY, w: cardW, h: cardH });
+        
+        const checkOverlap = (x, y, w, h) => {
+          const gap = 15; // gap between elements
+          for (let rect of occupied) {
+            if (
+              x < rect.x + rect.w + gap &&
+              x + w + gap > rect.x &&
+              y < rect.y + rect.h + gap &&
+              y + h + gap > rect.y
+            ) {
+              return true; // overlaps
+            }
+          }
+          return false;
+        };
+
+        const generatePos = (w, h) => {
+          let x, y;
+          let attempts = 0;
+          const maxW = window.innerWidth - w - padding * 2;
+          const maxH = window.innerHeight - h - padding * 2;
+          
+          do {
+            x = padding + Math.floor(Math.random() * Math.max(0, maxW));
+            y = padding + Math.floor(Math.random() * Math.max(0, maxH));
+            attempts++;
+          } while (checkOverlap(x, y, w, h) && attempts < 150);
+          
+          occupied.push({ x, y, w, h });
+          return { x, y };
+        };
+
+        // Generate Input box position FIRST (larger = harder to place)
+        const inW = 220, inH = 220;
+        const inputLoc = generatePos(inW, inH);
+        setInputPos({
+          top: `${inputLoc.y}px`,
+          left: `${inputLoc.x}px`,
+          position: 'fixed',
+          transform: 'none',
+          zIndex: 1000
+        });
+
+        // Generate 4 random digits in non-overlapping locations
+        const pinW = 80, pinH = 80;
+        let newPinStr = '';
+        const digits = [];
+
+        for (let i = 0; i < 4; i++) {
+          const digit = Math.floor(Math.random() * 10).toString();
+          newPinStr += digit;
+          
+          const loc = generatePos(pinW, pinH);
+          
+          digits.push({
+            digit,
+            order: i + 1,
+            pos: {
+              top: `${loc.y}px`,
+              left: `${loc.x}px`,
+              position: 'fixed',
+              transform: 'none',
+              zIndex: 1000
+            }
+          });
+        }
+        
+        setTargetPin(newPinStr);
+        setPinDigits(digits);
+        setCurrentInput('');
+      } else if (roomState.isLocked) {
+        // Reset position when locked
+        setPinDigits([]);
+        setInputPos({ top: '60%', left: '50%', transform: 'translate(-50%, -50%)' });
+        setTargetPin('');
+        setCurrentInput('');
+      }
+      
       setIsLocked(roomState.isLocked);
     }
     
     function onBuzzed(newBuzz) {
-      // Confetti ONLY if I am the host OR if I am the one who buzzed?
-      // Let's do a small burst for everyone when someone buzzes
       const isMe = newBuzz.playerName === name;
-      
-      // If I am the winner (first buzz), big explosion
-      // We need to know if this is the FIRST buzz. 
-      // We can check buzzes.length in state, but state might be stale.
-      // Ideally server sends "rank". 
-      
-      // Simple logic: fire confetti
       confetti({
         particleCount: 50,
         spread: 60,
@@ -65,12 +151,14 @@ function App() {
     }
 
     function onResetBuzzer() {
-       // Maybe a "whoosh" sound
+       setPinDigits([]);
+       setInputPos({ top: '60%', left: '50%', transform: 'translate(-50%, -50%)' });
+       setTargetPin('');
+       setCurrentInput('');
     }
 
     function onError(msg) {
       setErrorMsg(msg);
-      // Shake effect usually done via CSS class toggle
       setTimeout(() => setErrorMsg(''), 3000); 
     }
 
@@ -89,7 +177,7 @@ function App() {
       socket.off('reset_buzzer', onResetBuzzer);
       socket.off('error', onError);
     };
-  }, [name]); // Re-bind if name changes, although name shouldn't change mid-game usually
+  }, [name, isLocked]); // Add isLocked as dependency so closure captures it
 
   const joinRoom = (role) => {
     if (!room || !name) {
@@ -100,7 +188,6 @@ function App() {
     socket.emit('join_room', { room, name, role });
     setGameState(role);
     
-    // Celebration for joining!
     confetti({
       particleCount: 100,
       spread: 70,
@@ -109,14 +196,23 @@ function App() {
   };
 
   const handleBuzz = () => {
+    // Check PIN validation if we are not locked and don't have a false start yet
+    // and haven't buzzed.
+    if (!isLocked && !iHaveFalseStart && !iHaveBuzzed) {
+      if (currentInput !== targetPin) {
+        setErrorMsg('INCORRECT PIN!');
+        setTimeout(() => setErrorMsg(''), 2000);
+        setCurrentInput(''); // Reset their input so they have to type again
+        return;
+      }
+    }
+
     socket.emit('buzz', { room });
-    // Haptic feedback if on mobile (supported browsers)
     if (navigator.vibrate) navigator.vibrate(50);
   };
 
   const handleStart = () => {
     socket.emit('start_round', { room });
-    // Play "Whistle" or "Go" sound?
   };
 
   const handleStop = () => {
@@ -129,6 +225,7 @@ function App() {
   
   const myBuzzIndex = buzzes.findIndex(b => b.playerName === name);
   const iHaveBuzzed = myBuzzIndex !== -1;
+  const iHaveFalseStart = falseStarts.includes(name);
 
   if (!isConnected) {
     return (
@@ -175,6 +272,32 @@ function App() {
           <div className="header-row">
             <h2>Room: {room}</h2>
             <div className="player-count">👥 {players.length}</div>
+          </div>
+
+          <div className="player-list-host" style={{marginTop: '1rem', marginBottom: '1rem'}}>
+            <h3 style={{fontSize: '1rem', color: '#666'}}>Joined Players:</h3>
+            {players.length === 0 ? (
+              <p style={{color: '#999', fontSize: '0.9rem'}}>No players joined yet.</p>
+            ) : (
+              <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px'}}>
+                {players.map((p, idx) => {
+                  const hasFalseStart = falseStarts.includes(p);
+                  return (
+                    <span key={idx} style={{
+                      background: hasFalseStart ? '#ffcccc' : '#f0f0f0', 
+                      padding: '4px 10px', 
+                      borderRadius: '15px', 
+                      fontSize: '0.9rem', 
+                      color: hasFalseStart ? '#cc0000' : '#333',
+                      textDecoration: hasFalseStart ? 'line-through' : 'none'
+                    }}>
+                      {hasFalseStart && '🚫 '}
+                      {getAvatar(p)} {p}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
           
           <div className="buzz-list">
@@ -244,7 +367,12 @@ function App() {
             
             {/* Status Message */}
             <div className="status-message">
-              {isLocked && !iHaveBuzzed ? (
+              {iHaveFalseStart ? (
+                <>
+                  <div className="lock-icon" style={{animation:'none'}}>🚫</div>
+                  <div style={{color: '#ff4444'}}>FALSE START! Locked out this round.</div>
+                </>
+              ) : isLocked && !iHaveBuzzed ? (
                 <>
                   <div className="lock-icon">🔒</div>
                   <div>Waiting for Host...</div>
@@ -257,18 +385,94 @@ function App() {
               ) : (
                 <>
                   <div className="lock-icon" style={{animation:'bounce 0.5s infinite'}}>⚡</div>
-                  <div style={{color: 'var(--primary)', fontSize:'2rem'}}>GO! GO! GO!</div>
+                  <div style={{color: 'var(--primary)', fontSize:'2rem'}}>FIND THE BUZZER!</div>
                 </>
               )}
             </div>
 
-            <button 
-              className={`big-buzzer ${iHaveBuzzed ? 'disabled rank-show' : ''} ${isLocked && !iHaveBuzzed ? 'disabled locked' : ''}`} 
-              onClick={handleBuzz} 
-              disabled={iHaveBuzzed || isLocked}
-            >
-              {iHaveBuzzed ? `#${myBuzzIndex + 1}` : (isLocked ? 'WAIT' : 'BUZZ!')}
-            </button>
+            {/* PIN Digits Display */}
+            {(!isLocked && !iHaveBuzzed && !iHaveFalseStart) && pinDigits.map((d, idx) => (
+              <div 
+                key={idx}
+                style={{
+                  ...d.pos, 
+                  background: 'var(--primary)', 
+                  color: 'white', 
+                  padding: '5px 10px', 
+                  borderRadius: '10px', 
+                  boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
+                  border: '3px solid var(--text-main)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '50px',
+                  minHeight: '60px'
+                }}
+              >
+                <span style={{ fontSize: '0.8rem', color: '#ffe', marginBottom: '2px', fontWeight: 'bold' }}>
+                  {['1st', '2nd', '3rd', '4th'][d.order - 1]}
+                </span>
+                <span style={{ fontSize: '2rem', fontWeight: '900', lineHeight: '1' }}>
+                  {d.digit}
+                </span>
+              </div>
+            ))}
+
+            {/* Input & Buzzer */}
+            {(!isLocked || iHaveBuzzed || iHaveFalseStart) && (
+              <div
+                className="input-buzzer-container"
+                style={
+                  iHaveFalseStart || iHaveBuzzed 
+                    ? { marginTop: '2rem' } 
+                    : {
+                        ...inputPos,
+                        background: 'white',
+                        padding: '1rem',
+                        borderRadius: '20px',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+                        border: '4px solid var(--text-main)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '10px'
+                      }
+                }
+              >
+                {(!isLocked && !iHaveBuzzed && !iHaveFalseStart) && (
+                  <input
+                    type="number"
+                    placeholder="Enter PIN"
+                    value={currentInput}
+                    onChange={(e) => setCurrentInput(e.target.value)}
+                    style={{ 
+                      width: '100%', 
+                      maxWidth: '180px',
+                      textAlign: 'center', 
+                      fontSize: '1.5rem', 
+                      letterSpacing: '5px', 
+                      marginBottom: '0',
+                      borderRadius: '10px'
+                    }}
+                  />
+                )}
+                
+                <button 
+                  className={`big-buzzer ${iHaveBuzzed ? 'disabled rank-show' : ''} ${iHaveFalseStart ? 'disabled locked' : ''}`} 
+                  onClick={handleBuzz} 
+                  disabled={iHaveBuzzed || iHaveFalseStart}
+                  style={
+                    iHaveFalseStart 
+                      ? {backgroundColor: '#555', boxShadow: '0 5px #333'} 
+                      : iHaveBuzzed ? {} 
+                      : { width: '150px', height: '150px', fontSize: '1.8rem', marginTop: '10px' }
+                  }
+                >
+                  {iHaveBuzzed ? `#${myBuzzIndex + 1}` : (iHaveFalseStart ? 'LOCKED OUT' : 'BUZZ!')}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
