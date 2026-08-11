@@ -31,10 +31,32 @@ function App() {
   const [targetPin, setTargetPin] = useState('');
   const [currentInput, setCurrentInput] = useState('');
 
+  // Refs for socket callbacks to avoid stale closures and constant re-binding
+  const gameStateRef = useRef(gameState);
+  const roomRef = useRef(room);
+  const nameRef = useRef(name);
+  const isLockedRef = useRef(isLocked);
+  const targetPinRef = useRef(targetPin);
+
+  useEffect(() => {
+    gameStateRef.current = gameState;
+    roomRef.current = room;
+    nameRef.current = name;
+    isLockedRef.current = isLocked;
+    targetPinRef.current = targetPin;
+  });
+
   useEffect(() => {
     // Socket event listeners
     function onConnect() {
       setIsConnected(true);
+      // Auto-rejoin room if socket reconnects after dropping (very common on Render/mobile)
+      const role = gameStateRef.current;
+      const r = roomRef.current;
+      const n = nameRef.current;
+      if (role !== 'LOBBY' && r && n) {
+        socket.emit('join_room', { room: r, name: n, role });
+      }
     }
 
     function onDisconnect() {
@@ -47,8 +69,11 @@ function App() {
       setBuzzes(roomState.buzzes || []);
       setFalseStarts(roomState.falseStarts || []);
       
-      // If we are transitioning from locked to unlocked, teleport the buzzer!
-      if (isLocked && !roomState.isLocked) {
+      const wasLocked = isLockedRef.current;
+      const hasNoPin = targetPinRef.current === '';
+
+      // Teleport digits if transitioning from locked to unlocked, OR if joining an already unlocked room
+      if (!roomState.isLocked && (wasLocked || hasNoPin)) {
         const padding = 20;
         
         // Define occupied areas to prevent overlaps
@@ -177,7 +202,7 @@ function App() {
       socket.off('reset_buzzer', onResetBuzzer);
       socket.off('error', onError);
     };
-  }, [name, isLocked]); // Add isLocked as dependency so closure captures it
+  }, []); // Empty dependency array because we use refs for state!
 
   const joinRoom = (role) => {
     if (!room || !name) {
