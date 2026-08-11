@@ -324,3 +324,69 @@ button:active {
   box-shadow: 0 5px 15px rgba(0,0,0,0.2);
   border-radius: 1rem;
 }
+
+/* Responsive adjustments for mobile */
+@media (max-width: 600px) {
+  body {
+    background-size: 20px 20px;
+  }
+  #root {
+    padding: 0.5rem;
+  }
+  .card, .player-card {
+    padding: 1.5rem;
+    min-height: 250px;
+    border-radius: 1.5rem;
+    border-width: 3px;
+    width: 90vw;
+    box-sizing: border-box;
+  }
+  h1 {
+    font-size: 2rem;
+    text-shadow: 2px 2px 0px var(--text-main);
+  }
+  h2 {
+    font-size: 1.5rem;
+  }
+  .player-info h2 {
+    font-size: 1.5rem;
+    padding: 0.5rem 1rem;
+  }
+  .status-message {
+    font-size: 1.2rem;
+  }
+  .lock-icon {
+    font-size: 3rem;
+  }
+  .big-buzzer {
+    width: 200px;
+    height: 200px;
+    font-size: 2.5rem;
+  }
+  .lobby button {
+    font-size: 1rem;
+    padding: 0.8rem;
+  }
+  input {
+    padding: 1rem;
+    font-size: 1rem;
+  }
+  .buttons {
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  .host-view .header-row {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+  .buzz-item {
+    padding: 0.8rem;
+    flex-direction: column;
+    text-align: center;
+    gap: 0.5rem;
+  }
+  .rank {
+    margin-right: 0;
+  }
+}
