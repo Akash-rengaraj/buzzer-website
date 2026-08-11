@@ -74,19 +74,22 @@ function App() {
 
       // Teleport digits if transitioning from locked to unlocked, OR if joining an already unlocked room
       if (!roomState.isLocked && (wasLocked || hasNoPin)) {
-        const padding = 20;
+        const padding = 15;
         
         // Define occupied areas to prevent overlaps
         const occupied = [];
         
-        // Add middle card (approx 500x400 centered)
-        const cardW = 550, cardH = 450; // slightly larger to give breathing room
-        const cardX = (window.innerWidth - cardW) / 2;
-        const cardY = (window.innerHeight - cardH) / 2;
-        occupied.push({ x: cardX, y: cardY, w: cardW, h: cardH });
+        // Add middle card (approx 500x400 centered) ONLY if screen is large enough
+        // On mobile, we let elements spawn over the center card because space is too limited.
+        if (window.innerWidth > 600) {
+          const cardW = 550, cardH = 450;
+          const cardX = (window.innerWidth - cardW) / 2;
+          const cardY = (window.innerHeight - cardH) / 2;
+          occupied.push({ x: cardX, y: cardY, w: cardW, h: cardH });
+        }
         
         const checkOverlap = (x, y, w, h) => {
-          const gap = 15; // gap between elements
+          const gap = 10; // gap between elements
           for (let rect of occupied) {
             if (
               x < rect.x + rect.w + gap &&
@@ -103,21 +106,22 @@ function App() {
         const generatePos = (w, h) => {
           let x, y;
           let attempts = 0;
-          const maxW = window.innerWidth - w - padding * 2;
-          const maxH = window.innerHeight - h - padding * 2;
+          // Clamp max bounds so they never become negative, which causes all elements to stack at (padding, padding)
+          const maxW = Math.max(10, window.innerWidth - w - padding * 2);
+          const maxH = Math.max(10, window.innerHeight - h - padding * 2);
           
           do {
-            x = padding + Math.floor(Math.random() * Math.max(0, maxW));
-            y = padding + Math.floor(Math.random() * Math.max(0, maxH));
+            x = padding + Math.floor(Math.random() * maxW);
+            y = padding + Math.floor(Math.random() * maxH);
             attempts++;
-          } while (checkOverlap(x, y, w, h) && attempts < 150);
+          } while (checkOverlap(x, y, w, h) && attempts < 100);
           
           occupied.push({ x, y, w, h });
           return { x, y };
         };
 
         // Generate Input box position FIRST (larger = harder to place)
-        const inW = 220, inH = 220;
+        const inW = 180, inH = 150; // Use more realistic bounds
         const inputLoc = generatePos(inW, inH);
         setInputPos({
           top: `${inputLoc.y}px`,
@@ -128,7 +132,7 @@ function App() {
         });
 
         // Generate 4 random digits in non-overlapping locations
-        const pinW = 80, pinH = 80;
+        const pinW = 70, pinH = 80;
         let newPinStr = '';
         const digits = [];
 
