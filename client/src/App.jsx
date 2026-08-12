@@ -30,6 +30,7 @@ function App() {
   const [inputPos, setInputPos] = useState({ top: '60%', left: '50%', transform: 'translate(-50%, -50%)' });
   const [targetPin, setTargetPin] = useState('');
   const [currentInput, setCurrentInput] = useState('');
+  const [optionalContent, setOptionalContent] = useState('');
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
 
   useEffect(() => {
@@ -192,6 +193,7 @@ function App() {
        setInputPos({ top: '60%', left: '50%', transform: 'translate(-50%, -50%)' });
        setTargetPin('');
        setCurrentInput('');
+       setOptionalContent('');
     }
 
     function onError(msg) {
@@ -244,7 +246,7 @@ function App() {
       }
     }
 
-    socket.emit('buzz', { room });
+    socket.emit('buzz', { room, content: optionalContent });
     if (navigator.vibrate) navigator.vibrate(50);
   };
 
@@ -360,6 +362,23 @@ function App() {
                       <span className="rank">#{i + 1}</span>
                       <span style={{fontSize:'1.5rem', marginRight:'10px'}}>{getAvatar(b.playerName)}</span>
                       <span className="player-name">{b.playerName}</span>
+                      {b.content && (
+                        <span style={{
+                          marginLeft: '10px',
+                          padding: '3px 8px',
+                          background: '#eef',
+                          border: '1px solid #ccd',
+                          borderRadius: '10px',
+                          fontSize: '0.85rem',
+                          color: '#333',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: '120px'
+                        }} title={b.content}>
+                          💬 {b.content}
+                        </span>
+                      )}
                     </div>
                     <span className="time">{(i === 0) ? 'WINNER!' : `+${(b.timestamp - buzzes[0].timestamp)}ms`}</span>
                   </li>
@@ -402,6 +421,38 @@ function App() {
               </div>
             </div>
             
+            {/* Optional Input Message */}
+            <div className="optional-message-container" style={{ margin: '1rem 0' }}>
+               <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '5px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                 Secret Message (Optional)
+               </div>
+               <input
+                 type="text"
+                 placeholder="Type here before you buzz..."
+                 value={optionalContent}
+                 onChange={(e) => setOptionalContent(e.target.value)}
+                 disabled={iHaveBuzzed || iHaveFalseStart}
+                 maxLength={40}
+                 style={{
+                   width: '100%',
+                   maxWidth: '320px',
+                   padding: '12px 20px',
+                   borderRadius: '25px',
+                   border: '2px solid transparent',
+                   backgroundColor: '#f5f7fa',
+                   boxShadow: 'inset 0 2px 5px rgba(0,0,0,0.05), 0 2px 5px rgba(0,0,0,0.02)',
+                   textAlign: 'center',
+                   fontSize: '1rem',
+                   color: '#333',
+                   outline: 'none',
+                   transition: 'all 0.3s ease',
+                   cursor: (iHaveBuzzed || iHaveFalseStart) ? 'not-allowed' : 'text'
+                 }}
+                 onFocus={(e) => { e.target.style.border = '2px solid var(--primary)'; e.target.style.backgroundColor = '#fff'; }}
+                 onBlur={(e) => { e.target.style.border = '2px solid transparent'; e.target.style.backgroundColor = '#f5f7fa'; }}
+               />
+            </div>
+
             {/* Status Message */}
             <div className="status-message">
               {iHaveFalseStart ? (

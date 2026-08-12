@@ -119,7 +119,7 @@ io.on("connection", (socket) => {
   });
 
   // --- BUZZ ---
-  socket.on("buzz", ({ room }) => {
+  socket.on("buzz", ({ room, content }) => {
     if (!room) return;
     const roomCode = room.toUpperCase();
     const currentRoom = rooms[roomCode];
@@ -152,7 +152,8 @@ io.on("connection", (socket) => {
     const buzzEntry = {
       playerName: player.name,
       socketId: socket.id,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      content: content || ""
     };
     currentRoom.buzzes.push(buzzEntry);
     
